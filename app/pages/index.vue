@@ -1,6 +1,7 @@
 <!-- pages/index.vue -->
 <template>
-  <div class="p-6">
+  <UPage>
+        <UPageHeader title="Mentel Airtime" />
     <AirtimeStkForm />
-  </div>
+  </UPage>
 </template>
