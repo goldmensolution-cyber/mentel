@@ -4,11 +4,11 @@ export default defineNuxtConfig({
 
   modules: ['@nuxt/ui', '@nuxt/eslint', '@nuxt/image', '@nuxthub/core', '@nuxtjs/supabase', '@vueuse/nuxt'],
   supabase: {
-      redirectOptions: {
+    redirectOptions: {
     login: '/login',
     callback: '/confirm',
-    include: undefined,
-    exclude: ['/','/about','/contact','/terms','/privacy','/pricing','/faqs','/login','/signup','/confirm','/forgot-password','/reset-password'],
+    include: [],
+    exclude: ['/','/about','/contact','/terms','/privacy','/pricing','/faqs','/login','/signup','/confirm','/forgot-password','/reset-password','/*','/**'],
     saveRedirectToCookie: false,
   }
   },

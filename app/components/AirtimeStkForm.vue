@@ -85,6 +85,7 @@ async function submit() {
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">Buy Airtime via M‑Pesa (STK Push)</h2>
           <UBadge color="primary">PayBill</UBadge>
+          <UColorModeSwitch />
         </div>
       </template>
 
