@@ -79,60 +79,74 @@ async function submit() {
 </script>
 
 <template>
-  <div class="max-w-xl mx-auto space-y-6">
-    <UCard>
+  <div class="max-w-xl relative mx-auto space-y-6">
+    <UButton variant="outline" class="bottom-2 right-2 fixed rounded-full  ">
+    <UColorModeButton  />
+    </UButton>
+    <UCard >
       <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Buy Airtime via M‑Pesa (STK Push)</h2>
-          <UBadge color="primary">PayBill</UBadge>
-          <UColorModeSwitch />
-        </div>
+        <h1 class="text-4xl font-extrabold text-center">Mentel Airtime</h1>
+        <p class="text-center">Buy airtime to airtel,telkom,faiba, safaricom and equitel numbers from Mpesa paybill</p>
       </template>
 
-      <div class="space-y-4">
+
+      <UCard variant="subtle">
+        <template #header>
+          <h1 class="text-center font-extrabold italic">Buy Airtime</h1>
+        </template>
         <div>
-          <label for="payer" class="block text-sm font-medium mb-1">Payer number</label>
-          <UInput
+  <UFormField label="Payer" help="We will send mpesa pin prompt here" required>
+    <UInput
             id="payer"
             v-model="payerInput"
             placeholder="e.g. 07XXXXXXXX or +2547XXXXXXXX"
             icon="i-lucide-smartphone"
-            :ui="{ base: 'w-full' }"
+            :ui="{ root: 'w-full' }"
             autocomplete="tel"
             inputmode="tel"
           />
+          </UFormField>
           <p v-if="payer" class="text-xs text-neutral-500 mt-1">Normalized: {{ payer }}</p>
         </div>
 
         <div>
-          <label for="recipient" class="block text-sm font-medium mb-1">Recipient number (Account Number)</label>
-          <UInput
+  <UFormField label="Recipient" help="Recipient number(Account Number)" class="w-full" required>
+    <UInput
             id="recipient"
             v-model="recipientInput"
             placeholder="e.g. 07XXXXXXXX or +2547XXXXXXXX"
             icon="i-lucide-user"
-            :ui="{ base: 'w-full' }"
+            :ui="{ root: 'w-full' }"
             autocomplete="tel"
+            variant="subtle"
             inputmode="tel"
           />
+          </UFormField>
           <p v-if="recipient" class="text-xs text-neutral-500 mt-1">Normalized: {{ recipient }}</p>
         </div>
 
-        <div>
-          <label for="amount" class="block text-sm font-medium mb-1">Amount (KES)</label>
-          <UInput
+  <UFormField label="Amount" help="Amount is a whole number in kenyan shillings" required>
+    <UFieldGroup class="w-full">
+      <UButton  variant="outline"  icon="i-lucide-wallet"/>
+
+    <UInputNumber
             id="amount"
             v-model.number="amountInput"
             placeholder="Whole number, e.g. 50"
-            icon="i-lucide-wallet"
-            :ui="{ base: 'w-full' }"
+            :format-options="{
+      style: 'currency',
+      currency: 'KES',
+      currencyDisplay: 'code',
+      currencySign: 'accounting'
+    }"
+            :ui="{ root: 'w-full' }"
             inputmode="numeric"
-            type="number"
+            orientation="vertical"
             min="1"
             step="1"
           />
-        </div>
-
+          </UFieldGroup>
+</UFormField>
         <div class="space-y-2">
           <UAlert v-if="warn" color="warning" title="Please check" :description="warn" />
           <UAlert v-if="info" color="info" title="Heads up" :description="info" />
@@ -145,7 +159,7 @@ async function submit() {
           />
           <UAlert v-if="success" color="success" title="Success" :description="success" />
         </div>
-
+        <template #footer>
         <div class="flex items-center gap-3">
           <UButton
             color="primary"
@@ -171,11 +185,14 @@ async function submit() {
           >
             Reset
           </UButton>
+
         </div>
-      </div>
+        </template>
+      </UCard>
 
       <template #footer>
-        <UAccordion :items="[
+        <UAccordion
+        :items="[
           { label: 'Steps to complete payment', slot: 'steps' },
           { label: 'Tips & troubleshooting', slot: 'tips' }
         ]">

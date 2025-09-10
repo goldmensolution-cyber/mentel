@@ -6,7 +6,7 @@ const { pluck } = useSupabaseCookieRedirect();
 watch(user, () => {
   if (user.value) {
     toast.add({ title: 'Authentication successful', color: 'success' });
-    navigateTo(pluck() || '/dashboard');
+    navigateTo(pluck() || '/');
   }
 }, { immediate: true });
 </script>
