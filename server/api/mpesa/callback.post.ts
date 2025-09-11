@@ -1,90 +1,95 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // server/api/mpesa/callback.post.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { defineEventHandler, readBody } from 'h3'
 import type { H3Event } from 'h3'
-import type { Database } from '~~/app/types/database.types'
-import { serverSupabaseClient } from '#supabase/server'
+import type { Json, Database } from '@/types/database.types'
+import { serverSupabaseServiceRole } from '#supabase/server'
 
 export default defineEventHandler(async (event: H3Event) => {
-  const supabase = await serverSupabaseClient<Database>(event)
-  const body = await readBody(event)
+  const supabase = serverSupabaseServiceRole<Database>(event)
+  const body = (await readBody(event)) as any
 
   const stk = body?.Body?.stkCallback
   if (!stk) {
-    // maybe Insert with default or required fields; pick only fields allowed in Insert type
-    const insertPayload: Database['public']['Tables']['mpesa_payments']['Insert'] = {
-      // fill minimal required fields
-      amount: 0,
-      phone_number_msisdn: '',  // if that's nullable
-      party_a_msisdn: '',
-      business_shortcode: process.env.MPESA_SHORTCODE ?? '',
-      party_b_shortcode: process.env.MPESA_SHORTCODE ?? '',
-      callback_url: '',
+    // Insert minimal fallback
+    const insertObj: Database['public']['Tables']['mpesa_payments']['Insert'] = {
       account_reference: '',
-      transaction_desc: 'Malformed Callback',
+      amount: 0,
+      business_shortcode: process.env.MPESA_SHORTCODE ?? '',
+      callback_url: process.env.MPESA_CALLBACK_URL ?? '',
+      party_a_msisdn: '',
+      party_b_shortcode: process.env.MPESA_SHORTCODE ?? '',
+      phone_number_msisdn: '',
+      transaction_type: 'CustomerPayBillOnline',
       status: 'failed',
-      // etc
+      transaction_desc: 'Malformed callback'
     }
-
-    await supabase.from('mpesa_payments').insert(insertPayload)
+    await supabase.from('mpesa_payments').insert(insertObj)
     return { ResultCode: 0, ResultDesc: 'OK' }
   }
 
-  // extract metadata
   const resultCode: number = stk.ResultCode
   const resultDesc: string = stk.ResultDesc
 
-  const items = stk.CallbackMetadata?.Item as Array<{ Name: string; Value?: any }> || []
+  const items = (stk.CallbackMetadata?.Item as Array<{ Name: string; Value?: any }> | undefined) ?? []
   const meta: Record<string, any> = {}
-  for (const it of items) { meta[it.Name] = it.Value }
+  for (const it of items) {
+    if (it.Name && it.Value !== undefined) {
+      meta[it.Name] = it.Value
+    }
+  }
 
-  const updatePayload: Partial<Database['public']['Tables']['mpesa_payments']['Update']> = {
+  const updateObj: Partial<Database['public']['Tables']['mpesa_payments']['Update']> = {
     result_code: resultCode,
     result_desc: resultDesc,
     paid_amount: meta.Amount ?? null,
     mpesa_receipt_number: meta.MpesaReceiptNumber ?? null,
-    transaction_time: meta.TransactionDate ? new Date(meta.TransactionDate).toISOString() : null,
+    transaction_time: meta.TransactionDate ? String(new Date(meta.TransactionDate).toISOString()) : null,
     payer_msisdn: meta.PhoneNumber ?? null,
-    callback_raw: body,
-    status: resultCode === 0 ? 'initiated' : 'failed'
+    callback_raw: body as Json,
+    // status must be from payment_status_enum
+    status: resultCode === 0 ? 'paid' : 'failed'
   }
 
-  // try update by checkout_request_id
-  const { data: updated1, error: err1 } = await supabase
+  // Try updating by checkout_request_id
+  const { data: updatedByCheckout, error: err1 } = await supabase
     .from('mpesa_payments')
-    .update(updatePayload)
-    .eq('checkout_request_id', stk.CheckoutRequestID)
+    .update(updateObj)
+    .eq('checkout_request_id', stk.CheckoutRequestID as string)
     .select('*')
 
-  let updated = updated1
-  if (!updated || updated.length === 0) {
-    const { data: updated2, error: err2 } = await supabase
+  let updated = updatedByCheckout
+  if ((!updated || updated.length === 0) && stk.MerchantRequestID) {
+    const { data: updatedByMerchant, error: err2 } = await supabase
       .from('mpesa_payments')
-      .update(updatePayload)
-      .eq('merchant_request_id', stk.MerchantRequestID)
+      .update(updateObj)
+      .eq('merchant_request_id', stk.MerchantRequestID as string)
       .select('*')
-    updated = updated2
+    updated = updatedByMerchant
   }
 
   if (!updated || updated.length === 0) {
-    // insert new
-    const insertPayload: Database['public']['Tables']['mpesa_payments']['Insert'] = {
+    // Insert new record
+    const insertObj: Database['public']['Tables']['mpesa_payments']['Insert'] = {
+      account_reference: meta.AccountReference ?? '', // sometimes Callback Metadata may include AccountReference
       amount: meta.Amount ?? 0,
-      phone_number_msisdn: meta.PhoneNumber ?? null,
-      party_a_msisdn: meta.PhoneNumber ?? null,
       business_shortcode: process.env.MPESA_SHORTCODE ?? '',
+      callback_url: process.env.MPESA_CALLBACK_URL ?? '',
+      party_a_msisdn: meta.PhoneNumber ?? '',
       party_b_shortcode: process.env.MPESA_SHORTCODE ?? '',
-      callback_url: '',
-      account_reference: '',
-      transaction_desc: resultDesc,
+      phone_number_msisdn: meta.PhoneNumber ?? '',
+      transaction_type: 'CustomerPayBillOnline',
+      status: resultCode === 0 ? 'paid' : 'failed',
+      // optional fields
       merchant_request_id: stk.MerchantRequestID ?? undefined,
       checkout_request_id: stk.CheckoutRequestID ?? undefined,
-      status: resultCode === 0 ? 'initiated' : 'failed'
-      // etc
+      transaction_desc: resultDesc,
+      callback_raw: body as Json
     }
-    await supabase.from('mpesa_payments').insert(insertPayload)
+    await supabase.from('mpesa_payments').insert(insertObj)
   }
 
+  // Always reply OK to Daraja so it won’t retry indefinitely
   return { ResultCode: 0, ResultDesc: 'OK' }
 })

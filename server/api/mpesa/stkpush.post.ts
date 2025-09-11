@@ -1,12 +1,11 @@
 // server/api/mpesa/stkpush.post.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { defineEventHandler, readBody, setResponseStatus } from 'h3'
-import type { Database } from '~~/app/types/database.types'
-
-import { serverSupabaseClient } from '#supabase/server'
 import type { H3Event } from 'h3'
+import type {  Database } from '@/types/database.types'
+import { serverSupabaseServiceRole } from '#supabase/server'
 
-type Body = {
+type StkPushBody = {
   payerMsisdn: string
   recipientMsisdn: string
   amount: number
@@ -40,137 +39,130 @@ async function getAccessToken(baseUrl: string, key: string, secret: string): Pro
 }
 
 export default defineEventHandler(async (event: H3Event) => {
-  try {
-    const body = (await readBody(event)) as Body
+  const supabase = serverSupabaseServiceRole<Database>(event)
 
-    // validate
-    if (!body?.payerMsisdn || !/^254(7|1)\d{8}$/.test(body.payerMsisdn)) {
-      setResponseStatus(event, 400)
-      return { ok: false, message: 'Invalid payer number.' }
-    }
-    if (!body?.recipientMsisdn || !/^254(7|1)\d{8}$/.test(body.recipientMsisdn)) {
-      setResponseStatus(event, 400)
-      return { ok: false, message: 'Invalid recipient number.' }
-    }
-    if (!Number.isInteger(body?.amount) || body.amount <= 0) {
-      setResponseStatus(event, 400)
-      return { ok: false, message: 'Amount must be a positive whole number.' }
-    }
+  const body = (await readBody(event)) as StkPushBody
 
-    // create supabase admin client (service role)
-  const supabase = await serverSupabaseClient<Database>(event)
-
-// Prepare insert payload: only fields in Database['public']['Tables']['mpesa_payments']['Insert']
-  const insertPayload: Database['public']['Tables']['mpesa_payments']['Insert'] = {
-    // for example, if business_shortcode has a default or nullable, maybe optional
-    business_shortcode: process.env.MPESA_SHORTCODE ?? '',
-    transaction_type: 'CustomerPayBillOnline',
-    amount: body.amount,
-    party_a_msisdn: body.payerMsisdn,
-    phone_number_msisdn: body.payerMsisdn,
-    party_b_shortcode: process.env.MPESA_SHORTCODE ?? '',
-    callback_url: process.env.MPESA_CALLBACK_URL || `${process.env.NUXT_PUBLIC_SITE_URL || process.env.SITE_URL || ''}/api/mpesa/callback`,
-    account_reference: body.recipientMsisdn,
-    transaction_desc: `Airtime for ${body.recipientMsisdn}`,
-    status: 'initiated'
-    // other fields that are insertable
-  }
-
-  const { data: mpesaRow, error: insertErr } = await supabase
-    .from('mpesa_payments')
-    .insert(insertPayload)
-    .select('*')
-    .single()  // ensures data: mpesa_payments.Row | null
-
-  if (insertErr || !mpesaRow) {
-    console.error('Insert error', insertErr)
-    setResponseStatus(event, 500)
-    return { ok: false, message: 'Failed to create mpesa_payments row' }
-  }
-
-
-
-    // Build STK payload and call Daraja
-    const baseUrl = env('SAFARICOM_BASE_URL')
-    const consumerKey = env('MPESA_CONSUMER_KEY')
-    const consumerSecret = env('MPESA_CONSUMER_SECRET')
-    const passkey = env('MPESA_PASSKEY')
-    const shortcode = env('MPESA_SHORTCODE')
-
-    const callbackEnv =
-      process.env.MPESA_CALLBACK_URL ||
-      process.env.NUXT_PUBLIC_SITE_URL ||
-      process.env.SITE_URL ||
-      ''
-    if (!callbackEnv) throw new Error('Missing MPESA_CALLBACK_URL / NUXT_PUBLIC_SITE_URL / SITE_URL')
-    const callbackUrl = callbackEnv.endsWith('/api/mpesa/callback')
-      ? callbackEnv
-      : `${callbackEnv.replace(/\/$/, '')}/api/mpesa/callback`
-
-    const token = await getAccessToken(baseUrl, consumerKey, consumerSecret)
-    const timestamp = yyyymmddHHMMSS()
-    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
-
-    const payload = {
-      BusinessShortCode: shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
-      Amount: body.amount,
-      PartyA: body.payerMsisdn,
-      PartyB: shortcode,
-      PhoneNumber: body.payerMsisdn,
-      CallBackURL: callbackUrl,
-      AccountReference: body.recipientMsisdn,
-      TransactionDesc: `Airtime for ${body.recipientMsisdn}`
-    }
-
-    // send STK Push
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stkRes: any = await $fetch(`${baseUrl}/mpesa/stkpush/v1/processrequest`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: payload
-    })
-
-    // Update mpesa_payments with daraja response fields
-    const updatePayload: Record<string, any> = {
-      response_code: stkRes?.ResponseCode ?? null,
-      response_description: stkRes?.ResponseDescription ?? null,
-      customer_message: stkRes?.CustomerMessage ?? null
-    }
-
-    if (stkRes?.MerchantRequestID) updatePayload.merchant_request_id = stkRes.MerchantRequestID
-    if (stkRes?.CheckoutRequestID) updatePayload.checkout_request_id = stkRes.CheckoutRequestID
-
-    // set status pending if ResponseCode === '0' else failed
-    updatePayload.status = stkRes?.ResponseCode === '0' ? 'pending' : 'failed'
-
-    const { error: updateErr } = await supabase
-      .from('mpesa_payments')
-      .update(updatePayload)
-      .eq('id', mpesaRow.id)
-
-    if (updateErr) console.error('Failed to update mpesa_payments after STK push', updateErr)
-
-    if (stkRes?.ResponseCode === '0') {
-      return {
-        ok: true,
-        message: stkRes?.CustomerMessage || 'STK Push sent. Check your phone.',
-        mpesa_payment_id: mpesaRow.id,
-        checkoutRequestID: stkRes?.CheckoutRequestID,
-        merchantRequestID: stkRes?.MerchantRequestID
-      }
-    }
-
+  // validation
+  if (!body?.payerMsisdn || !/^254(7|1)\d{8}$/.test(body.payerMsisdn)) {
     setResponseStatus(event, 400)
-    return { ok: false, message: stkRes?.errorMessage || stkRes?.ResponseDescription || 'STK Push failed.' }
-  } catch (e: any) {
-    console.error('STK Push error:', e?.response || e)
-    setResponseStatus(event, e?.statusCode || 500)
-    return { ok: false, message: e?.message || 'Server error.' }
+    return { ok: false, message: 'Invalid payer number.' }
+  }
+  if (!body?.recipientMsisdn || !/^254(7|1)\d{8}$/.test(body.recipientMsisdn)) {
+    setResponseStatus(event, 400)
+    return { ok: false, message: 'Invalid recipient number.' }
+  }
+  if (!Number.isInteger(body.amount) || body.amount <= 0) {
+    setResponseStatus(event, 400)
+    return { ok: false, message: 'Amount must be a positive integer.' }
+  }
+
+  // build insert object matching mpesa_payments.Insert
+  const insertObj: Database['public']['Tables']['mpesa_payments']['Insert'] = {
+    account_reference: body.recipientMsisdn,
+    amount: body.amount,
+    business_shortcode: env('MPESA_SHORTCODE'),
+    callback_url: env('MPESA_CALLBACK_URL') || `${process.env.NUXT_PUBLIC_SITE_URL}/api/mpesa/callback`,
+    party_a_msisdn: body.payerMsisdn,
+    party_b_shortcode: env('MPESA_SHORTCODE'),
+    phone_number_msisdn: body.payerMsisdn,
+    transaction_type: 'CustomerPayBillOnline',
+    // optional fields can be omitted; status has default? If not, set:
+    status: 'initiated'
+    // other optional: transaction_desc, etc.
+  }
+
+  const { data: mpesaRow, error: insertError } = await supabase
+    .from('mpesa_payments')
+    .insert(insertObj)
+    .select('*')
+    .single()
+
+  if (insertError || !mpesaRow) {
+    console.error('mpesa insert error', insertError)
+    setResponseStatus(event, 500)
+    return { ok: false, message: 'Failed to create payment record.' }
+  }
+
+  // STK Push with Daraja
+  const baseUrl = env('SAFARICOM_BASE_URL')
+  const consumerKey = env('MPESA_CONSUMER_KEY')
+  const consumerSecret = env('MPESA_CONSUMER_SECRET')
+  const passkey = env('MPESA_PASSKEY')
+  const shortcode = env('MPESA_SHORTCODE')
+
+  const callbackEnv = env('MPESA_CALLBACK_URL', false) || process.env.NUXT_PUBLIC_SITE_URL || ''
+  const callbackUrl = callbackEnv.endsWith('/api/mpesa/callback')
+    ? callbackEnv
+    : `${callbackEnv.replace(/\/$/, '')}/api/mpesa/callback`
+
+  const token = await getAccessToken(baseUrl, consumerKey, consumerSecret)
+  const timestamp = yyyymmddHHMMSS()
+  const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
+
+  const stkPayload = {
+    BusinessShortCode: shortcode,
+    Password: password,
+    Timestamp: timestamp,
+    TransactionType: 'CustomerPayBillOnline',
+    Amount: body.amount,
+    PartyA: body.payerMsisdn,
+    PartyB: shortcode,
+    PhoneNumber: body.payerMsisdn,
+    CallBackURL: callbackUrl,
+    AccountReference: body.recipientMsisdn,
+    TransactionDesc: `Airtime for ${body.recipientMsisdn}`
+  }
+
+  const stkRes: any = await $fetch(`${baseUrl}/mpesa/stkpush/v1/processrequest`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: stkPayload
+  })
+
+  // Build update object using Update type
+  const updateObj: Partial<Database['public']['Tables']['mpesa_payments']['Update']> = {}
+
+  if (stkRes.ResponseCode !== undefined) {
+    updateObj.response_code = stkRes.ResponseCode
+    updateObj.status = stkRes.ResponseCode === '0' ? 'awaiting_customer' : 'failed'
+  }
+  if (stkRes.ResponseDescription !== undefined) {
+    updateObj.response_description = stkRes.ResponseDescription
+  }
+  if (stkRes.CustomerMessage !== undefined) {
+    updateObj.customer_message = stkRes.CustomerMessage
+  }
+  if (stkRes.MerchantRequestID) {
+    updateObj.merchant_request_id = stkRes.MerchantRequestID
+  }
+  if (stkRes.CheckoutRequestID) {
+    updateObj.checkout_request_id = stkRes.CheckoutRequestID
+  }
+
+  const { error: updateError } = await supabase
+    .from('mpesa_payments')
+    .update(updateObj)
+    .eq('id', mpesaRow.id)
+
+  if (updateError) {
+    console.error('mpesa update error', updateError)
+    // do not necessarily fail response
+  }
+
+  if (stkRes.ResponseCode === '0') {
+    return {
+      ok: true,
+      message: stkRes.CustomerMessage ?? 'STK Push initiated, check phone.',
+      mpesa_payment_id: mpesaRow.id,
+      checkoutRequestID: stkRes.CheckoutRequestID,
+      merchantRequestID: stkRes.MerchantRequestID
+    }
+  } else {
+    setResponseStatus(event, 400)
+    return { ok: false, message: stkRes.errorMessage ?? stkRes.ResponseDescription ?? 'STK push failed.' }
   }
 })
