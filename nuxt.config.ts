@@ -12,6 +12,11 @@ export default defineNuxtConfig({
     saveRedirectToCookie: false,
   }
   },
+  nitro: {
+    experimental: {
+      openAPI: true
+    }
+  },
 
   css: ['~/assets/css/main.css'],
 

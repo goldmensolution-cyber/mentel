@@ -3,7 +3,7 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3'
 import type { H3Event } from 'h3'
 import type {  Database } from '@/types/database.types'
-import { serverSupabaseServiceRole } from '#supabase/server'
+import { serverSupabaseClient } from '#supabase/server'
 
 type StkPushBody = {
   payerMsisdn: string
@@ -39,7 +39,7 @@ async function getAccessToken(baseUrl: string, key: string, secret: string): Pro
 }
 
 export default defineEventHandler(async (event: H3Event) => {
-  const supabase = serverSupabaseServiceRole<Database>(event)
+  const supabase = await serverSupabaseClient<Database>(event)
 
   const body = (await readBody(event)) as StkPushBody
 
