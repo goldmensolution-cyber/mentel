@@ -106,7 +106,7 @@ console.log('Env values:', {
   const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
 
   const stkPayload = {
-    BusinessShortCode: shortcode,
+    BusinessShortCode: shortcode ,
     Password: password,
     Timestamp: timestamp,
     TransactionType: 'CustomerPayBillOnline',
