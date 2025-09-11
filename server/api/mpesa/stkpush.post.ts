@@ -3,7 +3,7 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3'
 import type { Database } from '~~/app/types/database.types'
 
-import { serverSupabaseServiceRole } from '#supabase/server' // server service role client (admin)
+import { serverSupabaseClient } from '#supabase/server'
 import type { H3Event } from 'h3'
 
 type Body = {
@@ -58,7 +58,7 @@ export default defineEventHandler(async (event: H3Event) => {
     }
 
     // create supabase admin client (service role)
-  const supabase = serverSupabaseServiceRole<Database>(event)
+  const supabase = await serverSupabaseClient<Database>(event)
 
 // Prepare insert payload: only fields in Database['public']['Tables']['mpesa_payments']['Insert']
   const insertPayload: Database['public']['Tables']['mpesa_payments']['Insert'] = {
