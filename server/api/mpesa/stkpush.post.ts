@@ -56,7 +56,12 @@ export default defineEventHandler(async (event: H3Event) => {
     setResponseStatus(event, 400)
     return { ok: false, message: 'Amount must be a positive integer.' }
   }
-
+console.log('In stkpush: body=', body)
+console.log('Env values:', {
+  shortcode: process.env.MPESA_SHORTCODE,
+  consumerKey: process.env.MPESA_CONSUMER_KEY,
+  baseUrl: process.env.SAFARICOM_BASE_URL
+})
   // build insert object matching mpesa_payments.Insert
   const insertObj: Database['public']['Tables']['mpesa_payments']['Insert'] = {
     account_reference: body.recipientMsisdn,
