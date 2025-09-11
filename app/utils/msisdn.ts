@@ -17,7 +17,8 @@ export function normalizeKeMsisdn(input: string): string {
 
   // Occasionally users enter 011..., but STK requires party A be Safaricom line (07/01 ranges).
   // We still allow 01XXXXXXXX and convert to 2541XXXXXXXX, but you may restrict to 07/01 series.
-  if (/^01\d{8}$/.test(s)) return "254" + s;
+  if (/^01\d{8}$/.test(s)) return "254" + s.slice(1);
+  if (/^2541\d{8}$/.test(s)) return s;
 
   // +2547XXXXXXXX would be caught by stripping '+' above
   return "";
