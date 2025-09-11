@@ -41,10 +41,7 @@ function validate(): boolean {
   if (amountInput.value == null || !Number.isInteger(amountInput.value) || amountInput.value <= 0) {
     errors.value.push('Amount must be a positive whole number (KES).')
   }
-  // if (payer.value && recipient.value && payer.value !== recipient.value) {
-  //   // STK PartyA can differ from AccountReference/recipient. We only warn to avoid surprising users.
-  //   warn.value = 'Payer number differs from recipient number. Ensure you intend to buy airtime for someone else.'
-  // }
+
   return errors.value.length === 0
 }
 
@@ -83,7 +80,7 @@ async function submit() {
     <UButton variant="outline" square class="bottom-2 right-2 fixed rounded-full  ">
     <UColorModeButton  />
     </UButton>
-    <UCard >
+    <UCard class="divide-y-0">
       <template #header>
         <h1 class="text-4xl font-extrabold text-center">Mentel Airtime</h1>
         <p class="text-center">Buy airtime to airtel,telkom,faiba, safaricom and equitel numbers from Mpesa paybill</p>
