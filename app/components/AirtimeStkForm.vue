@@ -41,10 +41,10 @@ function validate(): boolean {
   if (amountInput.value == null || !Number.isInteger(amountInput.value) || amountInput.value <= 0) {
     errors.value.push('Amount must be a positive whole number (KES).')
   }
-  if (payer.value && recipient.value && payer.value !== recipient.value) {
-    // STK PartyA can differ from AccountReference/recipient. We only warn to avoid surprising users.
-    warn.value = 'Payer number differs from recipient number. Ensure you intend to buy airtime for someone else.'
-  }
+  // if (payer.value && recipient.value && payer.value !== recipient.value) {
+  //   // STK PartyA can differ from AccountReference/recipient. We only warn to avoid surprising users.
+  //   warn.value = 'Payer number differs from recipient number. Ensure you intend to buy airtime for someone else.'
+  // }
   return errors.value.length === 0
 }
 
@@ -80,7 +80,7 @@ async function submit() {
 
 <template>
   <div class="max-w-xl relative mx-auto space-y-6">
-    <UButton variant="outline" class="bottom-2 right-2 fixed rounded-full  ">
+    <UButton variant="outline" square class="bottom-2 right-2 fixed rounded-full  ">
     <UColorModeButton  />
     </UButton>
     <UCard >
