@@ -1,6 +1,7 @@
 <!-- eslint-disable @typescript-eslint/no-explicit-any -->
-<!-- components/AirtimeStkForm.vue -->
+<!-- components/AirtimeStkForm.vue (disabled) -->
 <script setup lang="ts">
+/*
 import { ref, computed, onUnmounted } from 'vue'
 import { normalizeKeMsisdn, isValidKeMsisdnE164254 } from '~/utils/msisdn'
 
@@ -251,10 +252,11 @@ async function submit() {
     loading.value = false
   }
 }
+*/
 </script>
 
-
 <template>
+  <!--
   <div class="max-w-xl relative mx-auto space-y-6">
     <UButton variant="outline" square class="bottom-2 right-2 fixed rounded-full  ">
     <UColorModeButton  />
@@ -376,7 +378,7 @@ async function submit() {
             <ol class="list-decimal ms-5 space-y-2 text-sm">
               <li>Enter payer number (your Safaricom line), recipient number (who gets airtime), and amount.</li>
               <li>Tap “Pay with M‑Pesa”. You’ll receive an STK prompt on your phone.</li>
-              <li>Confirm details and enter your M‑Pesa PIN within 90 seconds.</li>
+              <li>Confirm details and enter your M-Pesa PIN within 90 seconds.</li>
               <li>Wait for confirmation; the page will update with success or error details.</li>
             </ol>
           </template>
@@ -392,4 +394,5 @@ async function submit() {
       </template>
     </UCard>
   </div>
+  -->
 </template>
